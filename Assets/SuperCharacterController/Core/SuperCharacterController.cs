@@ -102,6 +102,15 @@ public class SuperCharacterController : MonoBehaviour
     private const int MaxPushbackIterations = 2;
     private int TemporaryLayerIndex;
     private float fixedDeltaTime;
+    
+    // This is used to get a List of pushback Vectors and the collider
+    // that creates the pushback and that pushes the character
+    private struct colliderAndPushack {
+    	
+    	public Vector3 pushback;
+    	public Collider collider;
+    	
+    };
 
     private static SuperCollisionType defaultCollisionType;
 
@@ -367,6 +376,9 @@ public class SuperCharacterController : MonoBehaviour
                 {
                     if (debugPushbackMesssages)
                         DebugDraw.DrawMarker(contactPoint, 2.0f, Color.cyan, 0.0f, false);
+                        
+                    // Create List of all Pushback Vectors
+                    List<colliderAndPushack> pushbackVectors = new List<Vector> ();
 
                     Vector3 v = contactPoint - position;
 
@@ -401,8 +413,13 @@ public class SuperCharacterController : MonoBehaviour
                         }
 
                         contact = true;
-
-                        transform.position += v;
+                        
+                        colliderAndPushack thisColliderAndPushack;
+                        
+                        // Add the final pushback Vector to the List, and the collider where it comes from
+                        pushbackVectors.Add (thisColliderAndPushback);
+                        
+                        //transform.position += v;
 
                         col.gameObject.layer = TemporaryLayerIndex;
 
@@ -429,6 +446,65 @@ public class SuperCharacterController : MonoBehaviour
                         };
 
                         collisionData.Add(collision);
+                    }
+                    
+                    // Get the angle between each vector and another one
+                    foreach (colliderAndPushback colAndPushback in pushbackVectors)
+                    {
+                    	// Create a List which contains all of the pushback vectors except "pushback"
+                    	List<colliderAndPushback> otherPushbackVectors = pushbackVectors;
+                    	
+                    	otherPushbacks.Remove (colAndPushback);
+                    }
+                    
+                    foreach (colliderAndPushback otherColAndPushback in otherPushbackVectors)
+                    {
+                    	Vector3 pushback = colAndPushback.pushback;
+                    	Vector3 otherPushback = otherColAndPushback.pushback;
+                    	
+                    	float angle = Vector3.Angle (pushback, otherPushback);
+                    	
+                    	// If Angle between the two vectors is greater than 90 degrees, which mean thay are opposite
+                    	if (angle > 90f)
+                    	{
+                    		// Sum the two Vectors
+                    		Vector3 sumVector = pushback + otherPushback;
+                    		
+                    		// If the length of the sum vector equals to 0, get vector along surface of collider
+                    		if (sumVector.magnitude == 0f)
+                    		{
+                    			sumVector = Vector3.Cross (up, pushback);
+                    		}
+                    		
+                    		// Make its length the highest number there is in the Mathf class
+                    		sumVector = sumVector.normalized * Mathf.MaxValue;
+                    		
+                    		reversedSumVector = -sumVector;
+                    		
+                    		// The sum vector in world coordinates
+                    		worldSumVector = transform.position + sumVector;
+                    		worldReversedSumVector = -worldSumVector;
+                    		
+                    		// Cache the collider's layer so that we can cast against it
+                        	int layer = colAndPushback.collider.gameObject.Layer;
+                        	int layer2 = otherColAndPushback.collider.gameObject.Layer;
+                        	
+                        	colAndPushback.collider.gameObject.Layer = TemporaryLayerIndex;
+                        	otherColAndPushback.collider.gameObject.Layer = TemporaryLayerIndex;
+                    		
+                    		RaycastHit sphereCast = Physics.SphereCast (worldSumVectors, radius, reversedSumVector, out sphereCast, Mathf.Infinity, TemporaryLayerIndex);
+                    		
+                    		// And then we do the same thing, but with the reversed sum vector
+                    		RaycastHit sphereCast2 = Physics.SphereCast (reversedWorldSumVector, radius, sumVector, out sphereCast2, Mathf.Infinity, TemporaryLayerIndex);
+                    		
+                    		Vector3 hitPoint = Vector3.Distance (sphereCast.point, SpherePosition (sphere)) <= Vector3.Distance (sphereCast2.point, SpherePosition (sphere));
+                    		
+                    		//TODO: get origin of sphere that hit the collider, and teleport character to that position
+                    		
+                    		// Set the layers back to what they were
+                    		colAndPushback.collider.gameObject.Layer = layer;
+                        	otherColAndPushback.collider.gameObject.Layer = layer2;
+                    	}
                     }
                 }
             }
